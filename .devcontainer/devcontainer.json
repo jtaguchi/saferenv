@@ -1,9 +1,7 @@
 {
     "name": "saferenv",
-    // "image": "docker.io/library/rust:1.88-slim-trixie",
-    "build": {
-        "dockerfile": "Dockerfile"
-    },
+    "image": "docker.io/library/rust:1.88-slim-trixie",
+    "postCreateCommand": "rustup component add rustfmt clippy",
     // Features to add to the dev container. More info: https://containers.dev/features.
     "features": {
         "ghcr.io/devcontainers/features/git:1": {}
