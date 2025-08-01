@@ -1,4 +1,5 @@
 use std::env;
+use std::process;
 
 use clap::Parser;
 use log::{debug, error, info, trace, warn};
@@ -17,7 +18,7 @@ struct Cli {
     #[arg(short, long)]
     ignore_environment: bool,
 
-    /// Print more detailed logs
+    /// Print more detailed logs (use up to 3: -v, -vv, -vvv)
     #[arg(short, long, action = clap::ArgAction::Count)]
     verbosity: u8,
 
@@ -25,17 +26,15 @@ struct Cli {
     command: Option<Vec<String>>,
 }
 
-fn main() {
-    let cli = Cli::parse();
-
-    let log_level = match cli.verbosity {
+fn setup_logging(verbosity: u8) -> Result<(), exitcode::ExitCode> {
+    let log_level = match verbosity {
         0 => log::LevelFilter::Warn,
         1 => log::LevelFilter::Info,
         2 => log::LevelFilter::Debug,
         3 => log::LevelFilter::Trace,
         _ => {
             eprintln!("verbosity level cannot be greater than 3 (-vvv)");
-            std::process::exit(1);
+            return Err(exitcode::USAGE);
         }
     };
 
@@ -44,9 +43,35 @@ fn main() {
         .filter_level(log_level)
         .init();
 
+    Ok(())
+}
+
+fn remove_all_env_vars() {
+    for (ref key, _) in env::vars_os() {
+        unsafe {
+            env::remove_var(key);
+        }
+    }
+}
+
+fn main() -> process::ExitCode {
+    let cli = Cli::parse();
+
+    match setup_logging(cli.verbosity) {
+        Ok(_) => debug!("Logging initialized at level {}", cli.verbosity),
+        Err(e) => return process::ExitCode::from(e as u8),
+    }
+
     debug!("{cli:?}");
 
-    // if cli.command
-    // println!(command);
-    // print_env_vars();
+    if cli.ignore_environment {
+        remove_all_env_vars();
+    }
+
+    match cli.command {
+        Some(command) => println!("{command:?}"),
+        _ => print_env_vars(),
+    }
+
+    process::ExitCode::SUCCESS
 }
