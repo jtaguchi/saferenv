@@ -15,9 +15,9 @@ fn print_env_vars() {
 fn apply_env_var_filters(set: &[OsString], unset: &[OsString], ignore_environment: bool) {
     for (ref key, _) in env::vars_os() {
         if set.contains(key) {
-            info!("Keep key {key:?} (explicit-set)");
+            info!("Keep key {key:?} (explicit_set)");
         } else if unset.contains(key) {
-            info!("Remove key {key:?} (explicit-unset)");
+            info!("Remove key {key:?} (explicit_unset)");
             unsafe {
                 env::remove_var(key);
             }
@@ -99,16 +99,39 @@ fn main() -> process::ExitCode {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serial_test::serial;
+
+    struct SavedEnv {
+        env: env::VarsOs,
+    }
+
+    impl Drop for SavedEnv {
+        fn drop(&mut self) {
+            for (key, val) in &mut self.env {
+                unsafe {
+                    env::set_var(key, val);
+                }
+            }
+        }
+    }
 
     #[test]
+    #[serial(env)]
     fn test_ignore_environment() {
+        let _saved_env = SavedEnv {
+            env: env::vars_os(),
+        };
         apply_env_var_filters(&[], &[], true);
         assert_eq!(env::vars_os().count(), 0);
     }
 
     // This isn't working because it's sharing the same process
     #[test]
+    #[serial(env)]
     fn test_ignore_environment_with_set() {
+        let _saved_env = SavedEnv {
+            env: env::vars_os(),
+        };
         let check_key = OsString::from("SHELL");
         dbg!(env::vars_os());
         env::vars_os().any(|x| x.0 == check_key);
