@@ -457,6 +457,7 @@ dependencies = [
  "log",
  "nix",
  "pretty_assertions",
+ "regex",
  "serial_test",
 ]
 
