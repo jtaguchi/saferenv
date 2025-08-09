@@ -44,13 +44,13 @@ fn apply_env_var_filters(keep: &[OsString], unset: &[OsString], ignore_environme
 
 #[derive(Parser, Default, Debug)]
 #[command(version, about)]
-/// env but a little safer
+/// saferenv - env but a little safer
 struct Cli {
     /// Start with an empty environment
     #[arg(help_heading = Some("env options"), short, long)]
     ignore_environment: bool,
 
-    /// Remove variable from the environment (--set has higher priority)
+    /// Remove variable from the environment (--keep has higher priority)
     #[arg(help_heading = Some("env options"), short, long, value_name="NAME")]
     unset: Vec<OsString>,
 
