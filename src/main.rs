@@ -1,9 +1,10 @@
+use nix::unistd::execvp;
 use std::env;
-use std::ffi::OsString;
+use std::ffi::{CString, OsString};
 use std::process;
 
 use clap::Parser;
-use log::{debug, info};
+use log::{debug, info, trace};
 
 fn print_env_vars() {
     for (var_key, var_val) in env::vars() {
@@ -13,6 +14,9 @@ fn print_env_vars() {
 
 /// Apply changes to envvironment variables per options given
 fn apply_env_var_filters(set: &[OsString], unset: &[OsString], ignore_environment: bool) {
+    if ignore_environment {
+        info!("ignore_environment is on. All variables will be removed unless kept explicitly");
+    }
     for (ref key, _) in env::vars_os() {
         if set.contains(key) {
             info!("Keep key {key:?} (explicit_set)");
@@ -53,6 +57,7 @@ struct Cli {
     verbosity: u8,
 
     /// The COMMAND to run in the resulting environment. If no COMMAND, print the resulting environment.
+    #[arg(trailing_var_arg = true)]
     command: Option<Vec<String>>,
 }
 
@@ -89,7 +94,19 @@ fn main() -> process::ExitCode {
     apply_env_var_filters(&cli.set, &cli.unset, cli.ignore_environment);
 
     match cli.command {
-        Some(command) => println!("{command:?}"),
+        Some(command) => {
+            let Ok(program) = CString::new(command[0].clone()) else {
+                return process::ExitCode::from(exitcode::DATAERR as u8);
+            };
+            let mut argv: Vec<CString> = Vec::new();
+            argv.push(CString::new(command[0].clone()).expect("Could not process arg0"));
+            for arg in &command[1..] {
+                argv.push(CString::new(arg.clone()).expect("Could not process arg"));
+                trace!("{argv:?}")
+            }
+            execvp(&program, &argv).expect_err("execvp should never return if successful");
+        }
+        // If a command was not given, print env variables
         _ => print_env_vars(),
     }
 
