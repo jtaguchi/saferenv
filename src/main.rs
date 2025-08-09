@@ -95,11 +95,14 @@ fn main() -> process::ExitCode {
 
     match cli.command {
         Some(command) => {
+            info!("Executing command...")
             let Ok(program) = CString::new(command[0].clone()) else {
                 return process::ExitCode::from(exitcode::DATAERR as u8);
             };
             let mut argv: Vec<CString> = Vec::new();
+            // argv0 is added separately here for when I implement the --argv0 option someday
             argv.push(CString::new(command[0].clone()).expect("Could not process arg0"));
+            trace!("{argv:?}");
             for arg in &command[1..] {
                 argv.push(CString::new(arg.clone()).expect("Could not process arg"));
                 trace!("{argv:?}")
@@ -107,7 +110,10 @@ fn main() -> process::ExitCode {
             execvp(&program, &argv).expect_err("execvp should never return if successful");
         }
         // If a command was not given, print env variables
-        _ => print_env_vars(),
+        _ => {
+            info!("No command. Printing environment variables");
+            print_env_vars();
+        }
     }
 
     process::ExitCode::SUCCESS
