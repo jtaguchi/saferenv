@@ -12,13 +12,22 @@ fn print_env_vars() {
     }
 }
 
+struct Rule {
+    name: String,
+    pattern: String,
+}
+
+struct Config {
+    rules: Vec<Rule>,
+}
+
 /// Apply changes to envvironment variables per options given
-fn apply_env_var_filters(set: &[OsString], unset: &[OsString], ignore_environment: bool) {
+fn apply_env_var_filters(keep: &[OsString], unset: &[OsString], ignore_environment: bool) {
     if ignore_environment {
         info!("ignore_environment is on. All variables will be removed unless kept explicitly");
     }
     for (ref key, _) in env::vars_os() {
-        if set.contains(key) {
+        if keep.contains(key) {
             info!("Keep key {key:?} (explicit_set)");
         } else if unset.contains(key) {
             info!("Remove key {key:?} (explicit_unset)");
@@ -50,7 +59,7 @@ struct Cli {
     // config: Option<String>,
     /// Pass variable to the new environment
     #[arg(help_heading = Some("saferenv options"), short, long, value_name="NAME")]
-    set: Vec<OsString>,
+    keep: Vec<OsString>,
 
     /// Print more detailed logs (repeat up to 3 times: -v, -vv, -vvv)
     #[arg(short, long = "debug", action = clap::ArgAction::Count)]
@@ -91,11 +100,13 @@ fn main() -> process::ExitCode {
 
     debug!("{cli:?}");
 
-    apply_env_var_filters(&cli.set, &cli.unset, cli.ignore_environment);
+    let rules: Vec<Rule> = Vec::new();
+
+    apply_env_var_filters(&cli.keep, &cli.unset, cli.ignore_environment);
 
     match cli.command {
         Some(command) => {
-            info!("Executing command...")
+            info!("Executing command...");
             let Ok(program) = CString::new(command[0].clone()) else {
                 return process::ExitCode::from(exitcode::DATAERR as u8);
             };
