@@ -4,7 +4,7 @@ use std::ffi::{CString, OsString};
 use std::process;
 
 use clap::Parser;
-use log::{debug, info, trace};
+use log::{debug, info, trace, warn};
 
 fn print_env_vars() {
     for (var_key, var_val) in env::vars() {
@@ -12,16 +12,48 @@ fn print_env_vars() {
     }
 }
 
+#[derive(Debug, PartialEq, Eq, Clone)]
 struct Rule {
     name: String,
     pattern: String,
+    action: RuleAction,
 }
 
+#[derive(Debug, PartialEq, Eq, Clone)]
 struct Config {
     rules: Vec<Rule>,
 }
 
-/// Apply changes to envvironment variables per options given
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+enum RuleAction {
+    Keep,
+    Redact,
+    Unset,
+}
+
+fn load_rules() -> Vec<Rule> {
+    let mut rules: Vec<Rule> = Vec::new();
+    // for keep in &cli.keep {
+    //     rules.push(Rule {
+    //         name: String::from("cli_explicit_keep"),
+    //         pattern: String::from(keep),
+    //     });
+    // }
+    rules.push(Rule {
+        name: String::from("aws_secret_access_key"),
+        pattern: String::from(r"^AWS_SECRET_ACCESS_KEY$"),
+        action: RuleAction::Redact,
+    });
+    rules.push(Rule {
+        name: String::from("aws_secret_access_key"),
+        pattern: String::from(r"TERM"),
+        action: RuleAction::Redact,
+    });
+
+    rules
+}
+
+/// Apply changes to environment variables per options given
 fn apply_env_var_filters(keep: &[OsString], unset: &[OsString], ignore_environment: bool) {
     if ignore_environment {
         info!("ignore_environment is on. All variables will be removed unless kept explicitly");
@@ -90,6 +122,17 @@ fn setup_logging(verbosity: u8) -> Result<(), exitcode::ExitCode> {
     Ok(())
 }
 
+fn detect_and_warn_non_utf8_environment() {
+    if let Ok(val) = env::var("LANG") {
+        debug!("LANG={val:?}");
+        if val.ends_with(".UTF-8") {
+            warn!(
+                "Non UTF-8 environment detected. Only UTF-8 is currently supported and errors may occur."
+            );
+        }
+    }
+}
+
 fn main() -> process::ExitCode {
     let cli = Cli::parse();
 
@@ -98,9 +141,11 @@ fn main() -> process::ExitCode {
         Err(e) => return process::ExitCode::from(e as u8),
     }
 
+    detect_and_warn_non_utf8_environment();
+
     debug!("{cli:?}");
 
-    let rules: Vec<Rule> = Vec::new();
+    let rules = load_rules();
 
     apply_env_var_filters(&cli.keep, &cli.unset, cli.ignore_environment);
 
@@ -135,6 +180,8 @@ mod tests {
     use super::*;
     use serial_test::serial;
 
+    // Used to save and restore environment variables after each test
+    #[derive(Debug)]
     struct SavedEnv {
         env: env::VarsOs,
     }
@@ -166,6 +213,7 @@ mod tests {
         let _saved_env = SavedEnv {
             env: env::vars_os(),
         };
+        // Using SHELL as a test variable
         let check_key = OsString::from("SHELL");
         dbg!(env::vars_os());
         env::vars_os().any(|x| x.0 == check_key);
