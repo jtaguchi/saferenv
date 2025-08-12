@@ -1,4 +1,6 @@
 use nix::unistd::execvp;
+use regex::Regex;
+use regex::RegexBuilder;
 use std::env;
 use std::ffi::{CString, OsString};
 use std::process;
@@ -21,9 +23,14 @@ struct Rule {
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 struct Config {
+    // The list of rules
     rules: Vec<Rule>,
+
+    // The value to set for the 'Redact' action
+    redact_value: String,
 }
 
+// Types of actions that can be taken when a Rule matches
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 enum RuleAction {
     Keep,
@@ -31,22 +38,45 @@ enum RuleAction {
     Unset,
 }
 
-fn load_rules() -> Vec<Rule> {
+fn load_rules(keep: &Vec<String>, unset: &Vec<String>) -> Vec<Rule> {
     let mut rules: Vec<Rule> = Vec::new();
-    // for keep in &cli.keep {
-    //     rules.push(Rule {
-    //         name: String::from("cli_explicit_keep"),
-    //         pattern: String::from(keep),
-    //     });
-    // }
+    for pattern in keep {
+        rules.push(Rule {
+            name: String::from("cli_explicit_keep"),
+            pattern: String::from(pattern),
+            action: RuleAction::Keep,
+        });
+    }
+    for pattern in unset {
+        rules.push(Rule {
+            name: String::from("cli_explicit_unset"),
+            pattern: String::from(pattern),
+            action: RuleAction::Unset,
+        });
+    }
+
+    // Add default rules
+    // Generic patterns
     rules.push(Rule {
-        name: String::from("aws_secret_access_key"),
-        pattern: String::from(r"^AWS_SECRET_ACCESS_KEY$"),
+        name: String::from("generic_secret"),
+        pattern: String::from(r"(_|-)SECRET$"),
         action: RuleAction::Redact,
     });
     rules.push(Rule {
+        name: String::from("generic_secret_token"),
+        pattern: String::from(r"(_|-)TOKEN$"),
+        action: RuleAction::Redact,
+    });
+    rules.push(Rule {
+        name: String::from("generic_secret_key"),
+        pattern: String::from(r"(_|-)KEY$"),
+        action: RuleAction::Redact,
+    });
+
+    // Specific patterns
+    rules.push(Rule {
         name: String::from("aws_secret_access_key"),
-        pattern: String::from(r"TERM"),
+        pattern: String::from(r"^AWS_SECRET_ACCESS_KEY$"),
         action: RuleAction::Redact,
     });
 
@@ -54,23 +84,59 @@ fn load_rules() -> Vec<Rule> {
 }
 
 /// Apply changes to environment variables per options given
-fn apply_env_var_filters(keep: &[OsString], unset: &[OsString], ignore_environment: bool) {
+fn apply_env_var_filters(config: &Config, ignore_environment: bool) {
     if ignore_environment {
         info!("ignore_environment is on. All variables will be removed unless kept explicitly");
     }
-    for (ref key, _) in env::vars_os() {
-        if keep.contains(key) {
-            info!("Keep key {key:?} (explicit_set)");
-        } else if unset.contains(key) {
-            info!("Remove key {key:?} (explicit_unset)");
-            unsafe {
-                env::remove_var(key);
+    for (ref key_os, _) in env::vars_os() {
+        trace!("Processing key: {:?}", &key_os);
+        let key = match key_os.clone().into_string() {
+            Ok(decoded_key) => {
+                trace!("Successfully decoded key");
+                decoded_key
             }
-        } else if ignore_environment {
-            unsafe {
-                env::remove_var(key);
+            Err(_) => {
+                warn!("Skip proccessing non UTF-8 key: {key_os:?}");
+                break;
             }
-        }
+        };
+
+        'rule_matching: {
+            for rule in &config.rules {
+                trace!("Checking rule {}", &rule.name);
+                let re = RegexBuilder::new(&rule.pattern)
+                    .case_insensitive(true)
+                    .build()
+                    .unwrap();
+                if re.is_match(&key) {
+                    info!(
+                        "Key '{}' matched rule '{}'. Will take action '{:?}'",
+                        &key, &rule.name, &rule.action
+                    );
+                    match rule.action {
+                        RuleAction::Redact => {
+                            if ignore_environment {
+                                unsafe { env::remove_var(&key) }
+                            } else {
+                                unsafe { env::set_var(&key, &config.redact_value) }
+                            }
+                        }
+                        RuleAction::Unset => unsafe {
+                            env::remove_var(&key);
+                        },
+                        RuleAction::Keep => {}
+                    }
+                    break 'rule_matching;
+                }
+            }
+            // No rules matched
+            if ignore_environment {
+                trace!("ignore_environment is on. Removing key '{key}'");
+                unsafe {
+                    env::remove_var(key);
+                }
+            }
+        };
     }
 }
 
@@ -84,14 +150,11 @@ struct Cli {
 
     /// Remove variable from the environment (--keep has higher priority)
     #[arg(help_heading = Some("env options"), short, long, value_name="NAME")]
-    unset: Vec<OsString>,
+    unset: Vec<String>,
 
-    // /// Config file path
-    // #[arg(help_heading = Some("saferenv options"), short, long)]
-    // config: Option<String>,
     /// Pass variable to the new environment
     #[arg(help_heading = Some("saferenv options"), short, long, value_name="NAME")]
-    keep: Vec<OsString>,
+    keep: Vec<String>,
 
     /// Print more detailed logs (repeat up to 3 times: -v, -vv, -vvv)
     #[arg(short, long = "debug", action = clap::ArgAction::Count)]
@@ -125,7 +188,7 @@ fn setup_logging(verbosity: u8) -> Result<(), exitcode::ExitCode> {
 fn detect_and_warn_non_utf8_environment() {
     if let Ok(val) = env::var("LANG") {
         debug!("LANG={val:?}");
-        if val.ends_with(".UTF-8") {
+        if !val.ends_with(".UTF-8") {
             warn!(
                 "Non UTF-8 environment detected. Only UTF-8 is currently supported and errors may occur."
             );
@@ -145,9 +208,15 @@ fn main() -> process::ExitCode {
 
     debug!("{cli:?}");
 
-    let rules = load_rules();
+    let rules = load_rules(&cli.keep, &cli.unset);
+    let config = Config {
+        rules,
+        redact_value: String::from("[REDACTED]"),
+    };
 
-    apply_env_var_filters(&cli.keep, &cli.unset, cli.ignore_environment);
+    debug!("{:#?}", config.rules);
+
+    apply_env_var_filters(&config, cli.ignore_environment);
 
     match cli.command {
         Some(command) => {
@@ -167,7 +236,7 @@ fn main() -> process::ExitCode {
         }
         // If a command was not given, print env variables
         _ => {
-            info!("No command. Printing environment variables");
+            info!("No command provided. Printing environment variables");
             print_env_vars();
         }
     }
@@ -202,11 +271,17 @@ mod tests {
         let _saved_env = SavedEnv {
             env: env::vars_os(),
         };
-        apply_env_var_filters(&[], &[], true);
+
+        // Add a var that should be unset in ignore_environment mode
+        unsafe { env::set_var("MY_REDACTED_TOKEN", "blahblah") };
+        let config = Config {
+            rules: Vec::new(),
+            redact_value: String::from("[REDACTED]"),
+        };
+        apply_env_var_filters(&config, true);
         assert_eq!(env::vars_os().count(), 0);
     }
 
-    // This isn't working because it's sharing the same process
     #[test]
     #[serial(env)]
     fn test_ignore_environment_with_set() {
@@ -219,11 +294,41 @@ mod tests {
         env::vars_os().any(|x| x.0 == check_key);
         assert!(env::vars_os().any(|x| x.0 == check_key));
 
-        let set = [check_key];
-        dbg!(&set);
+        let keep = vec![check_key.into_string().unwrap()];
+        dbg!(&keep);
         dbg!(env::vars_os());
-        apply_env_var_filters(&set, &[], true);
+        let rules = load_rules(&keep, &vec![]);
+        let config = Config {
+            rules,
+            redact_value: String::from("[REDACTED]"),
+        };
+        apply_env_var_filters(&config, true);
         dbg!(env::vars_os());
         assert_eq!(env::vars_os().count(), 1);
+    }
+
+    #[test]
+    #[serial(env)]
+    fn test_default_generic_rules() {
+        let _saved_env = SavedEnv {
+            env: env::vars_os(),
+        };
+
+        unsafe { env::set_var("MY_TOKEN", "secretvalue") };
+
+        dbg!(env::vars_os());
+        let rules = load_rules(&vec![], &vec![]);
+        let config = Config {
+            rules,
+            redact_value: String::from("[REDACTED]"),
+        };
+        apply_env_var_filters(&config, false);
+        dbg!(env::vars_os());
+        assert!(env::var("MY_TOKEN").unwrap() == "[REDACTED]");
+        assert!(env::var("MY-TOKEN").unwrap() == "[REDACTED]");
+        assert!(env::var("MY_SECRET").unwrap() == "[REDACTED]");
+        assert!(env::var("MY-SECRET").unwrap() == "[REDACTED]");
+        assert!(env::var("MY_KEY").unwrap() == "[REDACTED]");
+        assert!(env::var("MY-KEY").unwrap() == "[REDACTED]");
     }
 }
