@@ -85,7 +85,7 @@ fn apply_env_var_filters(config: &Config, ignore_environment: bool) {
 
 #[derive(Parser, Default, Debug)]
 #[command(version, about)]
-/// saferenv - env but a little safer
+/// saferenv - env but a little safer (code: https://github.com/jtaguchi/saferenv)
 struct Cli {
     /// Start with an empty environment
     #[arg(help_heading = Some("env options"), short, long)]
