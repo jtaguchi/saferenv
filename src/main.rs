@@ -95,9 +95,13 @@ struct Cli {
     #[arg(help_heading = Some("env options"), short, long, value_name="NAME")]
     unset: Vec<String>,
 
-    /// Pass variable to the new environment
+    /// Prevent variable from being redacted or unset
     #[arg(help_heading = Some("saferenv options"), short, long, value_name="NAME")]
     keep: Vec<String>,
+
+    /// Set any redacted variables to this value
+    #[arg(help_heading = Some("saferenv options"), short, long, value_name="VALUE", default_value="[REDACTED]")]
+    redact_value: String,
 
     /// Print more detailed logs (repeat up to 3 times: -v, -vv, -vvv)
     #[arg(short, long = "debug", action = clap::ArgAction::Count)]
@@ -154,7 +158,7 @@ fn main() -> process::ExitCode {
     let rules = load_rules(&cli.keep, &cli.unset);
     let config = Config {
         rules,
-        redact_value: String::from("[REDACTED]"),
+        redact_value: cli.redact_value,
     };
 
     debug!("{:#?}", config.rules);
