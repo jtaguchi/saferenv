@@ -47,6 +47,11 @@ pub fn load_rules(keep: &Vec<String>, unset: &Vec<String>) -> Vec<Rule> {
         pattern: String::from(r"(_|-)KEY$"),
         action: RuleAction::Redact,
     });
+    rules.push(Rule {
+        name: String::from("saferenv_test"),
+        pattern: String::from(r"^SAFERENV_TEST$"),
+        action: RuleAction::Redact,
+    });
 
     // Specific patterns
     // ...but then I realized that the generic patterns were pretty decent
