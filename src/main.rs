@@ -1,3 +1,7 @@
+mod rules;
+
+use crate::rules::{RuleAction, load_rules};
+
 use nix::unistd::execvp;
 use regex::Regex;
 use regex::RegexBuilder;
@@ -15,72 +19,12 @@ fn print_env_vars() {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-struct Rule {
-    name: String,
-    pattern: String,
-    action: RuleAction,
-}
-
-#[derive(Debug, PartialEq, Eq, Clone)]
 struct Config {
     // The list of rules
-    rules: Vec<Rule>,
+    rules: Vec<rules::Rule>,
 
     // The value to set for the 'Redact' action
     redact_value: String,
-}
-
-// Types of actions that can be taken when a Rule matches
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
-enum RuleAction {
-    Keep,
-    Redact,
-    Unset,
-}
-
-fn load_rules(keep: &Vec<String>, unset: &Vec<String>) -> Vec<Rule> {
-    let mut rules: Vec<Rule> = Vec::new();
-    for pattern in keep {
-        rules.push(Rule {
-            name: String::from("cli_explicit_keep"),
-            pattern: String::from(pattern),
-            action: RuleAction::Keep,
-        });
-    }
-    for pattern in unset {
-        rules.push(Rule {
-            name: String::from("cli_explicit_unset"),
-            pattern: String::from(pattern),
-            action: RuleAction::Unset,
-        });
-    }
-
-    // Add default rules
-    // Generic patterns
-    rules.push(Rule {
-        name: String::from("generic_secret"),
-        pattern: String::from(r"(_|-)SECRET$"),
-        action: RuleAction::Redact,
-    });
-    rules.push(Rule {
-        name: String::from("generic_secret_token"),
-        pattern: String::from(r"(_|-)TOKEN$"),
-        action: RuleAction::Redact,
-    });
-    rules.push(Rule {
-        name: String::from("generic_secret_key"),
-        pattern: String::from(r"(_|-)KEY$"),
-        action: RuleAction::Redact,
-    });
-
-    // Specific patterns
-    rules.push(Rule {
-        name: String::from("aws_secret_access_key"),
-        pattern: String::from(r"^AWS_SECRET_ACCESS_KEY$"),
-        action: RuleAction::Redact,
-    });
-
-    rules
 }
 
 /// Apply changes to environment variables per options given
@@ -314,7 +258,14 @@ mod tests {
             env: env::vars_os(),
         };
 
-        unsafe { env::set_var("MY_TOKEN", "secretvalue") };
+        unsafe {
+            env::set_var("MY_TOKEN", "secretvalue");
+            env::set_var("MY-TOKEN", "secretvalue");
+            env::set_var("MY_SECRET", "secretvalue");
+            env::set_var("MY-SECRET", "secretvalue");
+            env::set_var("MY_KEY", "secretvalue");
+            env::set_var("MY-KEY", "secretvalue");
+        };
 
         dbg!(env::vars_os());
         let rules = load_rules(&vec![], &vec![]);
