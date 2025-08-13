@@ -3,20 +3,13 @@ mod rules;
 use crate::rules::{RuleAction, load_rules};
 
 use nix::unistd::execvp;
-use regex::Regex;
 use regex::RegexBuilder;
 use std::env;
-use std::ffi::{CString, OsString};
+use std::ffi::CString;
 use std::process;
 
 use clap::Parser;
 use log::{debug, info, trace, warn};
-
-fn print_env_vars() {
-    for (var_key, var_val) in env::vars() {
-        println!("{var_key}={var_val}");
-    }
-}
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 struct Config {
@@ -25,6 +18,12 @@ struct Config {
 
     // The value to set for the 'Redact' action
     redact_value: String,
+}
+
+fn print_env_vars() {
+    for (var_key, var_val) in env::vars() {
+        println!("{var_key}={var_val}");
+    }
 }
 
 /// Apply changes to environment variables per options given
@@ -192,6 +191,7 @@ fn main() -> process::ExitCode {
 mod tests {
     use super::*;
     use serial_test::serial;
+    use std::ffi::OsString;
 
     // Used to save and restore environment variables after each test
     #[derive(Debug)]

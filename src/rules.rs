@@ -49,11 +49,7 @@ pub fn load_rules(keep: &Vec<String>, unset: &Vec<String>) -> Vec<Rule> {
     });
 
     // Specific patterns
-    rules.push(Rule {
-        name: String::from("aws_secret_access_key"),
-        pattern: String::from(r"^AWS_SECRET_ACCESS_KEY$"),
-        action: RuleAction::Redact,
-    });
+    // ...but then I realized that the generic patterns were pretty decent
 
     rules
 }
