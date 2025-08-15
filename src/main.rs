@@ -242,7 +242,7 @@ mod tests {
         env::vars_os().any(|x| x.0 == check_key);
         assert!(env::vars_os().any(|x| x.0 == check_key));
 
-        let keep = vec![check_key.into_string().unwrap()];
+        let keep = vec![format!("^{}$", check_key.into_string().unwrap())];
         dbg!(&keep);
         dbg!(env::vars_os());
         let rules = load_rules(&keep, &vec![]);
