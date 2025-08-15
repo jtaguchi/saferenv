@@ -15,17 +15,17 @@ pub enum RuleAction {
 
 pub fn load_rules(keep: &Vec<String>, unset: &Vec<String>) -> Vec<Rule> {
     let mut rules: Vec<Rule> = Vec::new();
-    for pattern in keep {
+    for key in keep {
         rules.push(Rule {
             name: String::from("cli_explicit_keep"),
-            pattern: String::from(pattern),
+            pattern: format!("^{key}$"),
             action: RuleAction::Keep,
         });
     }
-    for pattern in unset {
+    for key in unset {
         rules.push(Rule {
             name: String::from("cli_explicit_unset"),
-            pattern: String::from(pattern),
+            pattern: format!("^{key}$"),
             action: RuleAction::Unset,
         });
     }

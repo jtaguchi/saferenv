@@ -241,8 +241,9 @@ mod tests {
         dbg!(env::vars_os());
         env::vars_os().any(|x| x.0 == check_key);
         assert!(env::vars_os().any(|x| x.0 == check_key));
+        let key_value = env::var(&check_key).unwrap();
 
-        let keep = vec![format!("^{}$", check_key.into_string().unwrap())];
+        let keep = vec![check_key.clone().into_string().unwrap()];
         dbg!(&keep);
         dbg!(env::vars_os());
         let rules = load_rules(&keep, &vec![]);
@@ -253,6 +254,7 @@ mod tests {
         apply_env_var_filters(&config, true);
         dbg!(env::vars_os());
         assert_eq!(env::vars_os().count(), 1);
+        assert_eq!(env::var(&check_key).unwrap(), key_value)
     }
 
     #[test]
