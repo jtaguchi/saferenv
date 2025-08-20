@@ -83,6 +83,10 @@ fn apply_env_var_filters(config: &Config, ignore_environment: bool) {
     }
 }
 
+fn show_rules(config: &Config) {
+    println!("{:#?}", config.rules);
+}
+
 #[derive(Parser, Default, Debug)]
 #[command(version, about)]
 /// saferenv - env but a little safer (Source code: https://github.com/jtaguchi/saferenv)
@@ -102,6 +106,10 @@ struct Cli {
     /// Set any redacted variables to this value
     #[arg(help_heading = Some("saferenv options"), short, long, value_name="VALUE", default_value="[REDACTED]")]
     redact_value: String,
+
+    /// Show the current rules with the given config
+    #[arg(help_heading = Some("saferenv options"), long)]
+    show_rules: bool,
 
     /// Print more detailed logs (repeat up to 3 times: -v, -vv, -vvv)
     #[arg(short, long = "debug", action = clap::ArgAction::Count)]
@@ -161,7 +169,11 @@ fn main() -> process::ExitCode {
         redact_value: cli.redact_value,
     };
 
-    debug!("{:#?}", config.rules);
+    // debug!("{:#?}", config.rules);
+    if cli.show_rules {
+        show_rules(&config);
+        return process::ExitCode::SUCCESS;
+    }
 
     apply_env_var_filters(&config, cli.ignore_environment);
 
