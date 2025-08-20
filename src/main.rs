@@ -107,7 +107,7 @@ struct Cli {
     #[arg(help_heading = Some("saferenv options"), short, long, value_name="VALUE", default_value="[REDACTED]")]
     redact_value: String,
 
-    /// Show the current rules with the given config
+    /// Show the current rules with the given config and exit
     #[arg(help_heading = Some("saferenv options"), long)]
     show_rules: bool,
 
