@@ -84,7 +84,11 @@ fn apply_env_var_filters(config: &Config, ignore_environment: bool) {
 }
 
 fn show_rules(config: &Config) {
-    println!("{:#?}", config.rules);
+    for (index, rule) in config.rules.iter().enumerate() {
+        println!("Rule {}: {}", index + 1, rule.name);
+        println!("    pattern: \"{}\"", rule.pattern);
+        println!("    action: {:?}", rule.action);
+    }
 }
 
 #[derive(Parser, Default, Debug)]
