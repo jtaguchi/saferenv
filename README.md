@@ -63,11 +63,22 @@ Rule 2: cli_explicit_unset
 
 ## Installation
 
-### From source
+### Option 1. Use pre-built binaries
+
+Download pre-built Linux and MacOS binaries from the [saferenv releases page](https://github.com/jtaguchi/saferenv/releases), or using a terminal:
+
+```bash
+$ curl -LO https://github.com/jtaguchi/saferenv/releases/latest/download/saferenv-linux-amd64.tar.gz
+$ tar xzf saferenv-linux-amd64.tar.gz
+$ ./saferenv
+```
+
+### Option 2. Build from source
 ```bash
 $ git clone https://github.com/jtaguchi/saferenv.git
 $ cd saferenv
 $ cargo install --path .
+$ saferenv
 ```
 
 ---
