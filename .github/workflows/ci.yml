@@ -17,7 +17,7 @@ jobs:
     permissions:
       contents: none
     name: CI
-    needs: [test, rustfmt]
+    needs: [test, rustfmt, clippy]
     runs-on: ubuntu-latest
     if: "always()"
     steps:
@@ -68,4 +68,23 @@ jobs:
 
       - name: Check formatting
         run: cargo fmt --all -- --check
+
+  clippy:
+    name: clippy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "stable"
+          components: clippy
+
+      - name: Setup Cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Check formatting
+        run: cargo clippy -- -Dwarnings
         
