@@ -34,22 +34,27 @@ pub fn load_rules(keep: &Vec<String>, unset: &Vec<String>) -> Vec<Rule> {
     // Generic patterns
     rules.push(Rule {
         name: String::from("generic_secret"),
-        pattern: String::from(r"(_|-)SECRET$"),
+        pattern: String::from(r"(_|-)?SECRETS?$"),
         action: RuleAction::Redact,
     });
     rules.push(Rule {
         name: String::from("generic_secret_token"),
-        pattern: String::from(r"(_|-)TOKEN$"),
+        pattern: String::from(r"(_|-)?TOKENS?$"),
         action: RuleAction::Redact,
     });
     rules.push(Rule {
         name: String::from("generic_secret_key"),
-        pattern: String::from(r"(_|-)KEY$"),
+        pattern: String::from(r"(_|-)?KEYS?$"),
         action: RuleAction::Redact,
     });
     rules.push(Rule {
-        name: String::from("saferenv_test"),
-        pattern: String::from(r"^SAFERENV_TEST$"),
+        name: String::from("generic_password"),
+        pattern: String::from(r"(_|-)?PASSWORDS?$"),
+        action: RuleAction::Redact,
+    });
+    rules.push(Rule {
+        name: String::from("generic_password_short"),
+        pattern: String::from(r"(_|-)?PW$"),
         action: RuleAction::Redact,
     });
 
