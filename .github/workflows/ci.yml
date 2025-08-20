@@ -1,4 +1,4 @@
-name: cargo build and test
+name: Cargo CI
 
 on:
   push:
@@ -17,7 +17,7 @@ jobs:
     permissions:
       contents: none
     name: CI
-    needs: [test]
+    needs: [test, rustfmt]
     runs-on: ubuntu-latest
     if: "always()"
     steps:
@@ -49,3 +49,23 @@ jobs:
         
       - name: Run tests
         run: cargo test --verbose
+
+  rustfmt:
+    name: rustfmt
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "stable"
+          components: rustfmt
+
+      - name: Setup Cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+        
